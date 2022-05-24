@@ -10,4 +10,4 @@ rspotify = "0.11.5"
 dotenv = "0.15.0"
 open = "2.1.2"
 urlshortener = "3.0.0"
-
+futures = "0.3.21"

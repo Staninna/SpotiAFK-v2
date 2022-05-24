@@ -1184,6 +1184,7 @@ name = "spoti_afk"
 version = "0.1.0"
 dependencies = [
  "dotenv",
+ "futures",
  "open",
  "rspotify",
  "urlshortener",
