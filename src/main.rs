@@ -1,12 +1,17 @@
-// Imports
+/////////////
+// Imports //
+/////////////
 use dotenv::from_filename;
+use futures::executor::block_on;
 use open;
 use rspotify::{prelude::*, scopes, AuthCodeSpotify, Credentials, OAuth};
-use std::env;
-use std::io;
+use std::{env, io, process};
 use urlshortener::{client::UrlShortener, providers::Provider};
 
-// Useful functions
+//////////////////////
+// Useful functions //
+//////////////////////
+
 // Gets users input
 fn input(prompt: &str) -> String {
     // Prompt
@@ -18,38 +23,36 @@ fn input(prompt: &str) -> String {
     io::stdin()
         .read_line(&mut input)
         .expect("error: unable to read user input");
+
+    // Return input
     String::from(input.trim())
 }
 
-fn main() {
+//////////////////
+// Real program //
+//////////////////
+
+// Real entry point
+async fn real_main() -> Result<i32, i32> {
     // Get config variables
     from_filename(".env").ok();
 
-    auth_client();
+    // First authorization
+    let client = match init_client().await {
+        Some(client) => client,
+        None => {
+            return Err(1); // Authorization failed
+        }
+    };
+    Ok(0) // Program finished successfully
 }
 
-// Auth to spotify API
-fn auth_client() {
+/////////////////////////
+// Auth to spotify API //
+/////////////////////////
+async fn init_client() -> Option<rspotify::AuthCodeSpotify> {
     // Used scopes
-    let scopes = scopes!(
-        // "user-read-email",
-        // "user-read-private",
-        // "user-top-read",
-        // "user-read-recently-played",
-        // "user-follow-read",
-        // "user-library-read",
-        // "user-read-currently-playing",
-        // "user-read-playback-state",
-        // "user-read-playback-position",
-        // "playlist-read-collaborative",
-        // "playlist-read-private",
-        // "user-follow-modify",
-        // "user-library-modify",
-        // "user-modify-playback-state",
-        // "playlist-modify-public",
-        // "playlist-modify-private",
-        // "ugc-image-upload"
-    );
+    let scopes = scopes!("user-read-currently-playing");
 
     // initialization of client
     let credentials = Credentials::from_env().unwrap();
@@ -68,11 +71,11 @@ fn auth_client() {
         url.trim()
     );
 
-    // Open url in default browser without shortener
-    open::that(url).unwrap();
-
     // Let user login
     let redirect = input("Paste the redirected URL: ");
+
+    // Open url in default browser without shortener
+    open::that(url).unwrap();
 
     // Get token
     let response = client.parse_response_code(&redirect);
@@ -81,13 +84,15 @@ fn auth_client() {
         Some(code) => {
             client.request_token(code.as_str());
             client.read_token_cache(false);
-            // TODO get token somehow
+            return Some(client);
         }
-        None => println!("Something went wrong. Please try again"),
+        None => None,
     }
 }
 
-// Get url to open in browser
+////////////////////////////////
+// Get url to open in browser //
+////////////////////////////////
 fn get_authorize_url(client: &rspotify::AuthCodeSpotify) -> String {
     // Check if bitly api key is provided
     let bitly_key = env::var("BITLY_API_TOKEN");
@@ -104,10 +109,43 @@ fn get_authorize_url(client: &rspotify::AuthCodeSpotify) -> String {
                 token: env::var("BITLY_API_TOKEN").unwrap().to_owned(),
             },
         );
-        assert!(short_url.is_ok());
-        short_url.unwrap()
+        match short_url {
+            // If shortener successful return short url
+            Ok(_) => {
+                assert!(short_url.is_ok());
+                return short_url.unwrap();
+            }
+            // If failed return long url
+            Err(_) => return client.get_authorize_url(true).unwrap(),
+        }
     } else {
+        // If no bitly api key is provided return
         client.get_authorize_url(true).unwrap()
     };
+
+    // Return url
     url
 }
+
+/////////////////
+// Entry point //
+/////////////////
+fn main() {
+    // Run application and match on exit codes
+    process::exit(match block_on(real_main()) {
+        Ok(0) => {
+            println!("Program finished successfully");
+            0
+        }
+        Err(1) => {
+            println!("Authorization failed please try again");
+            1
+        }
+        _ => {
+            println!("Unexpected exit_code");
+            -1
+        }
+    });
+}
+
+// TODO refresh token https://github.com/ramsayleung/rspotify/blob/master/examples/with_refresh_token.rs
