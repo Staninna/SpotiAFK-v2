@@ -1,32 +1,10 @@
 /////////////
 // Imports //
 /////////////
-use dotenv::from_filename;
-use futures::executor::block_on;
-use open;
+use dotenv;
 use rspotify::{prelude::*, scopes, AuthCodeSpotify, Credentials, OAuth};
-use std::{env, io, process};
+use std::{env, process};
 use urlshortener::{client::UrlShortener, providers::Provider};
-
-//////////////////////
-// Useful functions //
-//////////////////////
-
-// Gets users input
-fn input(prompt: &str) -> String {
-    // Prompt
-    print!("{}", prompt);
-    io::Write::flush(&mut io::stdout()).expect("flush failed!");
-
-    // User input
-    let mut input = String::new();
-    io::stdin()
-        .read_line(&mut input)
-        .expect("error: unable to read user input");
-
-    // Return input
-    String::from(input.trim())
-}
 
 //////////////////
 // Real program //
@@ -35,10 +13,10 @@ fn input(prompt: &str) -> String {
 // Real entry point
 async fn real_main() -> Result<i32, i32> {
     // Get config variables
-    from_filename(".env").ok();
+    dotenv::from_filename(".env").ok();
 
     // First authorization
-    let client = match init_client().await {
+    let client = match init_client("user-read-currently-playing").await {
         Some(client) => client,
         None => {
             return Err(1); // Authorization failed
@@ -50,43 +28,19 @@ async fn real_main() -> Result<i32, i32> {
 /////////////////////////
 // Auth to spotify API //
 /////////////////////////
-async fn init_client() -> Option<rspotify::AuthCodeSpotify> {
-    // Used scopes
-    let scopes = scopes!("user-read-currently-playing");
-
+async fn init_client(scopes: &str) -> Option<rspotify::AuthCodeSpotify> {
     // initialization of client
     let credentials = Credentials::from_env().unwrap();
-    let oauth = OAuth::from_env(scopes).unwrap();
+    let oauth = OAuth::from_env(scopes!(scopes)).unwrap();
     let mut client = AuthCodeSpotify::new(credentials, oauth);
 
     // Get authorize url
     let url = get_authorize_url(&client);
 
-    // Print messages to user
-    println!(
-        "A webpage should open log into your spotify account and paste the redirected url here",
-    );
-    println!(
-        "If no webpage opened, please open this url in your browser:\n\x1b[32m{}\x1b[0m",
-        url.trim()
-    );
-
     // Let user login
-    let redirect = input("Paste the redirected URL: ");
-
-    // Open url in default browser without shortener
-    open::that(url).unwrap();
-
-    // Get token
-    let response = client.parse_response_code(&redirect);
-    match response {
-        #[allow(unused_must_use)]
-        Some(code) => {
-            client.request_token(code.as_str());
-            client.read_token_cache(false);
-            return Some(client);
-        }
-        None => None,
+    match client.prompt_for_token(&url).await {
+        Ok(_) => Some(client),
+        Err(_) => None,
     }
 }
 
@@ -130,9 +84,10 @@ fn get_authorize_url(client: &rspotify::AuthCodeSpotify) -> String {
 /////////////////
 // Entry point //
 /////////////////
-fn main() {
+#[tokio::main]
+async fn main() {
     // Run application and match on exit codes
-    process::exit(match block_on(real_main()) {
+    process::exit(match real_main().await {
         Ok(0) => {
             println!("Program finished successfully");
             0
