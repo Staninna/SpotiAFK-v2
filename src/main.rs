@@ -60,7 +60,6 @@ async fn auth_client() -> Result<rspotify::AuthCodeSpotify, i32> {
     let url = get_authorize_url(&client);
 
     // Let user login
-    // TODO add check for internet connection
     match client.prompt_for_token(&url).await {
         Ok(_) => Ok(client),
         Err(_) => Err(1), // Authorization failed
@@ -158,8 +157,11 @@ fn parse_client_config() -> Option<Config> {
 
 // Get url to open in browser
 fn get_authorize_url(client: &rspotify::AuthCodeSpotify) -> String {
-    // Check if bitly api key is provided
+    // TODO fix when wrong api key is provided that the code returns the long url
+    // Get destination url
     let long_url = client.get_authorize_url(true).unwrap();
+
+    // Check if bitly api key is provided
     let bitly_key = env::var("BITLY_API_TOKEN");
     let bitly = match bitly_key {
         Ok(_) => true,
@@ -248,7 +250,7 @@ async fn real_main() -> Result<i32, i32> {
     };
 
     // Check client prefix is correct in .env
-    match client.device().await {
+    match client.me().await {
         Ok(_) => (),
         Err(_) => return Err(2), // Failed parsing spotify client
     }
