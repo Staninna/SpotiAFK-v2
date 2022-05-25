@@ -2,43 +2,22 @@
 // Imports //
 /////////////
 use dotenv;
+use online::sync::check;
 use rspotify::{
-    prelude::*, scopes, AuthCodeSpotify, Config, Credentials, OAuth, DEFAULT_API_PREFIX,
-    DEFAULT_CACHE_PATH, DEFAULT_PAGINATION_CHUNKS,
+    model::SimplifiedPlaylist, prelude::*, scopes, AuthCodeSpotify, Config, Credentials, OAuth,
+    DEFAULT_API_PREFIX, DEFAULT_CACHE_PATH, DEFAULT_PAGINATION_CHUNKS,
 };
 use std::{env, path, process};
 use urlshortener::{client::UrlShortener, providers::Provider};
 
-//////////////////
-// Real program //
-//////////////////
+///////////////
+// Functions //
+///////////////
 
-// Real entry point
-async fn real_main() -> Result<i32, i32> {
-    // Get config variables
-    dotenv::from_filename(".env").ok();
+// Authentication
 
-    // First authorization and checks if everything works
-    let client = match init_client().await {
-        Ok(client) => client,
-        Err(1) => return Err(1),  // Authorization failed
-        Err(2) => return Err(2),  // Failed parsing config
-        Err(_) => return Err(-1), // Unexpected exit_code
-    };
-
-    // Check client prefix is correct in .env
-    match client.device().await {
-        Ok(_) => (),
-        Err(_) => return Err(2), // Failed parsing config
-    }
-
-    Ok(0) // Program finished successfully
-}
-
-/////////////////////////
-// Auth to spotify API //
-/////////////////////////
-async fn init_client() -> Result<rspotify::AuthCodeSpotify, i32> {
+// Auth to spotify API
+async fn auth_client() -> Result<rspotify::AuthCodeSpotify, i32> {
     // Api scopes
     let scopes = scopes!(
         "user-modify-playback-state",
@@ -59,15 +38,14 @@ async fn init_client() -> Result<rspotify::AuthCodeSpotify, i32> {
     let url = get_authorize_url(&client);
 
     // Let user login
+    // TODO add check for internet connection
     match client.prompt_for_token(&url).await {
         Ok(_) => Ok(client),
         Err(_) => Err(1), // Authorization failed
     }
 }
 
-/////////////////////////
-// Parse client config //
-/////////////////////////
+// Parse client config
 fn parse_client_config() -> Option<Config> {
     // Make buffer variables
     let mut rspotify_client_prefix = String::new();
@@ -135,9 +113,7 @@ fn parse_client_config() -> Option<Config> {
     }
 }
 
-////////////////////////////////
-// Get url to open in browser //
-////////////////////////////////
+// Get url to open in browser
 fn get_authorize_url(client: &rspotify::AuthCodeSpotify) -> String {
     // Check if bitly api key is provided
     let long_url = client.get_authorize_url(true).unwrap();
@@ -173,9 +149,75 @@ fn get_authorize_url(client: &rspotify::AuthCodeSpotify) -> String {
     url
 }
 
-/////////////////
-// Entry point //
-/////////////////
+// Api interaction
+
+// Get playlists
+async fn get_playlists(client: &rspotify::AuthCodeSpotify) -> Vec<SimplifiedPlaylist> {
+    // Make buffer variables
+    let offset = client.config.pagination_chunks;
+    let mut playlists = Vec::new();
+
+    // Get all playlists in a vector
+    let mut index = 0;
+    loop {
+        // Request next playlists
+        let response = client
+            .current_user_playlists_manual(Some(offset), Some(offset * index))
+            .await
+            .unwrap();
+
+        // Put received playlists in vector
+        for playlist in response.items {
+            playlists.push(playlist)
+        }
+
+        // If none playlist are left break
+        if response.next == None {
+            break;
+        }
+        index += 1;
+    }
+    playlists
+}
+
+/////////////
+// Program //
+/////////////
+
+// Real entry point
+async fn real_main() -> Result<i32, i32> {
+    // Check for internet connection
+    if check(None).is_err() {
+        return Err(3); // No internet connection
+    }
+
+    // Get config variables
+    dotenv::from_filename(".env").ok();
+
+    // First authorization and checks if everything works
+    let client = match auth_client().await {
+        Ok(client) => client,
+        Err(1) => return Err(1),  // Authorization failed
+        Err(2) => return Err(2),  // Failed parsing config
+        Err(_) => return Err(-1), // Unexpected exit_code
+    };
+
+    // Check client prefix is correct in .env
+    match client.device().await {
+        Ok(_) => (),
+        Err(_) => return Err(2), // Failed parsing config
+    }
+
+    let playlists = get_playlists(&client).await;
+
+    for playlist in playlists {
+        println!("{}", playlist.name)
+    }
+
+    Ok(0) // Program finished successfully
+}
+
+// Entry point
 #[tokio::main]
 async fn main() {
     // Run application and match on exit codes
@@ -185,12 +227,16 @@ async fn main() {
             0
         }
         Err(1) => {
-            println!("Authorization failed please try again");
+            println!("Authorization failed; please try again");
             1
         }
         Err(2) => {
-            println!("Failed parsing client config pleas check your .env file");
+            println!("Failed parsing client config. Please check your .env file");
             2
+        }
+        Err(3) => {
+            println!("Failed to connect to the internet, please check your connection");
+            3
         }
         _ => {
             println!("Unexpected exit_code");
