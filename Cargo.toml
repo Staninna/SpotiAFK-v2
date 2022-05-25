@@ -6,7 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rspotify = { version = "0.11.5", features = ["cli"] }
-tokio = { version = "1.18.2", features = ["full"] }
 dotenv = "0.15.0"
 urlshortener = "3.0.0"
+tokio = { version = "1.18.2", features = ["full"] }
+rspotify = { version = "0.11.5", features = ["cli"] }
+online = { version = "3.0.1",  default-features = false, features = ["sync"] }
