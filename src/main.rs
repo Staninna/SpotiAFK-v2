@@ -4,10 +4,12 @@
 use dotenv;
 use online::sync::check;
 use rspotify::{
-    model::SimplifiedPlaylist, prelude::*, scopes, AuthCodeSpotify, Config, Credentials, OAuth,
-    DEFAULT_API_PREFIX, DEFAULT_CACHE_PATH, DEFAULT_PAGINATION_CHUNKS,
+    model::{AdditionalType, Country, Market, SimplifiedPlaylist},
+    prelude::*,
+    scopes, AuthCodeSpotify, Config, Credentials, OAuth, DEFAULT_API_PREFIX, DEFAULT_CACHE_PATH,
+    DEFAULT_PAGINATION_CHUNKS,
 };
-use std::{env, mem, path, process};
+use std::{env, path, process};
 use urlshortener::{client::UrlShortener, providers::Provider};
 
 ///////////////
@@ -22,10 +24,25 @@ fn first<T>(v: &Vec<T>) -> Option<&T> {
     v.first()
 }
 
+// Get if connected to internet
+fn online() -> bool {
+    match check(None) {
+        Ok(_) => true,
+        Err(_) => false,
+    }
+}
+
+// Print type of variable
+// https://stackoverflow.com/questions/21747136/how-do-i-print-the-type-of-a-variable#answer-58119924
+#[allow(dead_code)] // Used for debugging
+fn print_type_of<T>(_: &T) {
+    println!("{}", std::any::type_name::<T>())
+}
+
 // Authentication
 
 // Auth to spotify API
-async fn auth_client() -> Result<rspotify::AuthCodeSpotify, i32> {
+async fn auth_client() -> Result<rspotify::AuthCodeSpotify, String> {
     let mut found_variables = 0;
     // Check if environment variable are present
     for (key, _) in env::vars() {
@@ -37,7 +54,7 @@ async fn auth_client() -> Result<rspotify::AuthCodeSpotify, i32> {
         }
     }
     if found_variables != 3 {
-        return Err(5); // Failed parsing spotify api
+        return Err(String::from("Failed parsing spotify api"));
     }
 
     // Api scopes
@@ -49,8 +66,8 @@ async fn auth_client() -> Result<rspotify::AuthCodeSpotify, i32> {
 
     // initialization of client
     let config = match parse_client_config() {
-        Some(config) => config,
-        None => return Err(2), // Failed parsing spotify client
+        Ok(config) => config,
+        Err(_) => return Err(String::from("Failed parsing spotify client")),
     };
     let credentials = Credentials::from_env().unwrap();
     let oauth = OAuth::from_env(scopes).unwrap();
@@ -62,12 +79,12 @@ async fn auth_client() -> Result<rspotify::AuthCodeSpotify, i32> {
     // Let user login
     match client.prompt_for_token(&url).await {
         Ok(_) => Ok(client),
-        Err(_) => Err(1), // Authorization failed
+        Err(_) => Err(String::from("Authorization failed")),
     }
 }
 
 // Parse spotify client settings
-fn parse_client_config() -> Option<Config> {
+fn parse_client_config() -> Result<Config, String> {
     // Make buffer variables
     let mut rspotify_client_prefix = String::new();
     let mut rspotify_client_cache_path = path::PathBuf::new();
@@ -141,54 +158,64 @@ fn parse_client_config() -> Option<Config> {
 
     // Check if there was a fail in the config
     match wrong_config {
-        true => None,
+        true => Err(String::from("Failed parsing spotify client")),
         false => match found_settings {
-            5 => Some(Config {
+            5 => Ok(Config {
                 prefix: rspotify_client_prefix,
                 cache_path: rspotify_client_cache_path,
                 pagination_chunks: rspotify_client_pagination_chunks,
                 token_cached: rspotify_client_token_cached,
                 token_refreshing: rspotify_client_token_refreshing,
             }),
-            _ => None,
+            _ => Err(String::from("Failed parsing spotify client")),
         },
     }
 }
 
 // Get url to open in browser
 fn get_authorize_url(client: &rspotify::AuthCodeSpotify) -> String {
-    // TODO fix when wrong api key is provided that the code returns the long url
     // Get destination url
     let long_url = client.get_authorize_url(true).unwrap();
+    #[allow(unused_assignments)] // Compiler complains
+    let mut url = String::new();
 
-    // Check if bitly api key is provided
-    let bitly_key = env::var("BITLY_API_TOKEN");
-    let bitly = match bitly_key {
-        Ok(_) => true,
-        Err(_) => false,
-    };
-
-    // Generate urls with or without bitly shortener
-    let url = if bitly {
-        let short_url = UrlShortener::new().unwrap().generate(
-            &long_url,
-            &Provider::BitLy {
-                token: bitly_key.unwrap().to_owned(),
-            },
-        );
-        match short_url {
-            // If shortener successful return short url
-            Ok(_) => {
-                assert!(short_url.is_ok());
-                return short_url.unwrap();
-            }
-            // If failed return long url
-            Err(_) => return long_url,
+    // Check if in WM/DE to spare bitly links you only have 100
+    match env::var("DISPLAY") {
+        Ok(_) => {
+            // Check if bitly api key is provided
+            let bitly_key = env::var("BITLY_API_TOKEN");
+            let bitly = match bitly_key {
+                Ok(_) => true,
+                Err(_) => false,
+            };
+            // Generate urls with or without bitly shortener
+            url = if bitly {
+                let short_url = UrlShortener::new().unwrap().generate(
+                    &long_url,
+                    &Provider::BitLy {
+                        token: bitly_key.unwrap().to_owned(),
+                    },
+                );
+                match short_url {
+                    // If shortener successful return short url
+                    Ok(short_url) => match short_url.as_str() {
+                        "INVALID_ARG_ACCESS_TOKEN" | "MONTHLY_RATE_LIMIT_EXCEEDED" => {
+                            return long_url
+                        }
+                        _ => {
+                            return short_url;
+                        }
+                    },
+                    // If failed return long url
+                    Err(_) => return long_url,
+                }
+            } else {
+                // If no bitly api key is provided return
+                long_url
+            };
         }
-    } else {
-        // If no bitly api key is provided return
-        long_url
-    };
+        Err(_) => url = long_url,
+    }
 
     // Return url
     url
@@ -226,15 +253,69 @@ async fn get_playlists(client: &rspotify::AuthCodeSpotify) -> Vec<SimplifiedPlay
     playlists
 }
 
+// Program functions
+
+// Get playlist to play
+async fn get_playlist(client: &rspotify::AuthCodeSpotify) -> Result<SimplifiedPlaylist, String> {
+    // Get playlist to play
+    match online() {
+        true => {
+            let playlists = get_playlists(&client).await;
+            let mut playlist_found = false;
+            let mut afk_playlist = first(&playlists).unwrap();
+            match env::var("PLAYLIST_NAME") {
+                Ok(_) => {
+                    for playlist in &playlists {
+                        if playlist.name == env::var("PLAYLIST_NAME").unwrap() {
+                            afk_playlist = &playlist;
+                            playlist_found = true;
+                            break;
+                        }
+                    }
+                }
+                Err(_) => return Err(String::from("Failed parsing playing settings")),
+            }
+            match playlist_found {
+                true => (),
+                false => return Err(String::from("Failed parsing playing settings")),
+            }
+            Ok(afk_playlist.clone())
+        }
+        false => Err(String::from("Failed to connect to the internet")),
+    }
+}
+
+// Can i play?
+async fn is_playing(
+    client: &rspotify::AuthCodeSpotify,
+    user_market: &Market,
+    content_types: &[AdditionalType; 2],
+) -> Result<bool, String> {
+    match online() {
+        true => {
+            let playing = client
+                .current_playing(Some(user_market), Some(content_types))
+                .await
+                .unwrap();
+            print_type_of(&playing);
+            match playing {
+                None => Ok(true),
+                Some(_) => Ok(false),
+            }
+        }
+        false => Err(String::from("Failed to connect to the internet")),
+    }
+}
+
 /////////////
 // Program //
 /////////////
 
 // Real entry point
-async fn real_main() -> Result<i32, i32> {
+async fn real_main() -> Result<String, String> {
     // Check for internet connection
-    if check(None).is_err() {
-        return Err(3); // No internet connection
+    if !online() {
+        return Err(String::from("Failed to connect to the internet"));
     }
 
     // Get config variables
@@ -243,71 +324,80 @@ async fn real_main() -> Result<i32, i32> {
     // First authorization and checks if everything works
     let client = match auth_client().await {
         Ok(client) => client,
-        Err(1) => return Err(1),  // Authorization failed
-        Err(2) => return Err(2),  // Failed parsing spotify client
-        Err(5) => return Err(5),  // Failed parsing spotify api
-        Err(_) => return Err(-1), // Unexpected exit_code
+        Err(e) => match e.as_str() {
+            "Authorization failed" => return Err(String::from("Authorization failed")),
+            "Failed parsing spotify client" => {
+                return Err(String::from("Failed parsing spotify client"))
+            }
+            "Failed parsing spotify api" => return Err(String::from("Failed parsing spotify api")),
+            _ => return Err(String::from("Unexpected exit_code")),
+        },
     };
 
-    // Check client prefix is correct in .env
-    match client.me().await {
-        Ok(_) => (),
-        Err(_) => return Err(2), // Failed parsing spotify client
+    // Getting data of current user
+
+    let mut user_country = Country::Netherlands;
+    #[allow(unused_assignments)] // For some reason the compiler complains
+    let mut user_market = Market::Country(user_country.clone());
+    let content_types = [AdditionalType::Track, AdditionalType::Episode];
+    match online() {
+        true => {
+            match client.me().await {
+                Ok(me) => {
+                    user_country = me.country.unwrap();
+                    user_market = Market::Country(user_country.clone());
+                }
+                // Check client prefix is correct in .env
+                Err(_) => return Err(String::from("Failed parsing spotify client")),
+            }
+        }
+        false => return Err(String::from("Failed to connect to the internet")),
     }
 
     // Get playlist to play
-    let playlists = get_playlists(&client).await;
-    let mut playlist_found = false;
-    let mut afk_playlist = first(&playlists).unwrap();
-    match env::var("PLAYLIST_NAME") {
-        Ok(_) => {
-            for playlist in &playlists {
-                if playlist.name == env::var("PLAYLIST_NAME").unwrap() {
-                    afk_playlist = &playlist;
-                    playlist_found = true;
-                    break;
-                }
+    let playlist = match get_playlist(&client).await {
+        Ok(playlist) => playlist,
+        Err(e) => match e.as_str() {
+            "Failed parsing playing settings" => {
+                return Err(String::from("Failed parsing playing settings"))
             }
-        }
-        Err(_) => return Err(4), // Failed parsing playing settings
-    }
-    match playlist_found {
-        true => (),
-        false => return Err(4), // Failed parsing playing settings
-    }
-    let afk_playlist = afk_playlist.clone();
-    mem::drop(playlists);
+            "Failed to connect to the internet" => {
+                return Err(String::from("Failed to connect to the internet"))
+            }
+            _ => return Err(String::from("Unexpected exit_code")),
+        },
+    };
 
     // End of program
-    Ok(0) // Program finished successfully
+    Ok(String::from("Program finished successfully"))
 }
 
 // Entry point
 #[tokio::main]
 async fn main() {
     // Run application and match on exit codes
-    process::exit(match real_main().await {
-        Ok(0) => {
+    process::exit(match real_main().await.unwrap().as_str() {
+        "Program finished successfully" => {
             println!("Program finished successfully");
             0
         }
-        Err(1) => {
+        "Authorization failed" => {
             println!("Authorization failed; please try again");
             1
         }
-        Err(2) => {
+        "Failed parsing spotify client" => {
             println!("Failed parsing spotify client. Please check your .env file");
             2
         }
-        Err(3) => {
+        "Failed to connect to the internet" => {
             println!("Failed to connect to the internet, please check your connection");
             3
         }
-        Err(4) => {
+        "Failed parsing playing settings" => {
             println!("Failed parsing playing settings. Please check your .env file");
             4
         }
-        Err(5) => {
+        "Failed parsing spotify api" => {
             println!("Failed parsing spotify api, Please check your .env file");
             5
         }
