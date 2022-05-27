@@ -224,7 +224,9 @@ fn get_authorize_url(client: &rspotify::AuthCodeSpotify) -> String {
 // Api interaction
 
 // Get playlists
-async fn get_playlists(client: &rspotify::AuthCodeSpotify) -> Vec<SimplifiedPlaylist> {
+async fn get_playlists(
+    client: &rspotify::AuthCodeSpotify,
+) -> Result<Vec<SimplifiedPlaylist>, String> {
     // Make buffer variables
     let offset = client.config.pagination_chunks;
     let mut playlists = Vec::new();
@@ -233,10 +235,13 @@ async fn get_playlists(client: &rspotify::AuthCodeSpotify) -> Vec<SimplifiedPlay
     let mut index = 0;
     loop {
         // Request next playlists
-        let response = client
-            .current_user_playlists_manual(Some(offset), Some(offset * index))
-            .await
-            .unwrap();
+        let response = match online() {
+            true => client
+                .current_user_playlists_manual(Some(offset), Some(offset * index))
+                .await
+                .unwrap(),
+            false => return Err(String::from("Failed to connect to the internet")),
+        };
 
         // Put received playlists in vector
         for playlist in response.items {
@@ -250,7 +255,7 @@ async fn get_playlists(client: &rspotify::AuthCodeSpotify) -> Vec<SimplifiedPlay
 
         index += 1;
     }
-    playlists
+    Ok(playlists)
 }
 
 // Program functions
@@ -260,7 +265,10 @@ async fn get_playlist(client: &rspotify::AuthCodeSpotify) -> Result<SimplifiedPl
     // Get playlist to play
     match online() {
         true => {
-            let playlists = get_playlists(&client).await;
+            let playlists = match get_playlists(&client).await {
+                Ok(playlists) => playlists,
+                Err(_) => return Err(String::from("Failed to connect to the internet")),
+            };
             let mut playlist_found = false;
             let mut afk_playlist = first(&playlists).unwrap();
             match env::var("PLAYLIST_NAME") {
