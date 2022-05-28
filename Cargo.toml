@@ -11,4 +11,3 @@ urlshortener = "3.0.0"
 tokio = { version = "1.18.2", features = ["full"] }
 rspotify = { version = "0.11.5", features = ["cli"] }
 online = { version = "3.0.1",  default-features = false, features = ["sync"] }
-shells = "0.2.0"
