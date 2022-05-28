@@ -1,3 +1,7 @@
+//////////
+// DOCS // https://docs.rs/rspotify/latest/rspotify
+//////////
+
 /////////////
 // Imports //
 /////////////
@@ -9,11 +13,13 @@ use rspotify::{
     model::{AdditionalType, Country, Market, SimplifiedPlaylist},
     prelude::*,
 };
-use std::{env, process};
+use std::{env, process::exit};
 
 // Self made files
 mod auth;
+mod spotifyd;
 use auth::auth_client;
+use spotifyd::init_spotifyd;
 
 ///////////////
 // Functions //
@@ -37,7 +43,7 @@ fn online() -> bool {
 
 // Print type of variable
 // https://stackoverflow.com/questions/21747136/how-do-i-print-the-type-of-a-variable#answer-58119924
-#[allow(dead_code)] // Used for debugging
+#[allow(dead_code)] // TODO Used for debugging
 fn print_type_of<T>(_: &T) {
     println!("{}", std::any::type_name::<T>())
 }
@@ -115,7 +121,8 @@ async fn get_playlist(client: &rspotify::AuthCodeSpotify) -> Result<SimplifiedPl
 }
 
 // Can i play?
-async fn is_playing(
+async fn _is_playing(
+    // TODO
     client: &rspotify::AuthCodeSpotify,
     user_market: &Market,
     content_types: &[AdditionalType; 2],
@@ -164,9 +171,8 @@ async fn real_main() -> Result<String, String> {
     };
 
     // Getting data of current user
-
     let mut user_country = Country::Netherlands;
-    #[allow(unused_assignments)] // For some reason the compiler complains
+    #[allow(unused_assignments)]
     let mut user_market = Market::Country(user_country.clone());
     let content_types = [AdditionalType::Track, AdditionalType::Episode];
     match online() {
@@ -204,8 +210,11 @@ async fn real_main() -> Result<String, String> {
 // Entry point
 #[tokio::main]
 async fn main() {
+    init_spotifyd();
+    return 0; // TODO currently working on spotifyd
+
     // Run application and match on exit codes
-    process::exit(match real_main().await.unwrap().as_str() {
+    exit(match real_main().await.unwrap().as_str() {
         "Program finished successfully" => {
             println!("Program finished successfully");
             0
@@ -216,19 +225,23 @@ async fn main() {
         }
         "Failed parsing spotify client" => {
             println!("Failed parsing spotify client. Please check your .env file");
-            2
+            1
         }
         "Failed to connect to the internet" => {
             println!("Failed to connect to the internet, please check your connection");
-            3
+            1
         }
         "Failed parsing playing settings" => {
             println!("Failed parsing playing settings. Please check your .env file");
-            4
+            1
         }
         "Failed parsing spotify api" => {
             println!("Failed parsing spotify api, Please check your .env file");
-            5
+            1
+        }
+        "Failed parsing spotifyd settings" => {
+            println!("Failed parsing spotifyd settings, Please check your .env file");
+            1
         }
         _ => {
             println!("Unexpected exit_code");

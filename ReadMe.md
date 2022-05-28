@@ -35,9 +35,10 @@ Documentation <https://spotifyd.github.io/spotifyd/Introduction.html>
 Spotifyd settings
 | Options              | Default                   | Info                                                                                 |
 |----------------------|---------------------------|--------------------------------------------------------------------------------------|
+| SPOTIFYD_CONFIG_PATH | .spotifyd.conf            | PAth where the spotifyd config file temporary get stored                             |
 | SPOTIFYD_USERNAME    | XXXXXXXXXXXXXXXXXXXXXXXXX | Your spotify username found on this page <https://www.spotify.com/account/overview/> |
-| SPOTIFYD_PASSWORD    | XXXXXXXXXXXXXXXXXXXXXXXXX | Your spotify password                                                                |
-| SPOTIFYD_DEVICE_NAME | AFK_DEVICE                | Name of device to connect to when being afk                                          |
+| SPOTIFYD_PASSWORD    | XXXXXXXXXXXXXXXXXXXXXXXXX | Your spotify password**                                                              |
+| SPOTIFYD_DEVICE_NAME | AFK_DEVICE                | The name of the device the program will use to afk with                              |
 
 Optional
 Bitly API
