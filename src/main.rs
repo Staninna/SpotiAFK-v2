@@ -157,6 +157,16 @@ async fn real_main() -> Result<String, String> {
     // Get config variables
     dotenv::from_filename(".env").ok();
 
+    // Check spotifyd
+    match init_spotifyd() {
+        Ok(_) => (),
+        Err(e) => match e.as_str() {
+            "Failed parsing spotifyd settings" => return Err(String::from("")),
+            "Failed to make spotifyd config file" => return Err(String::from("")),
+            _ => return Err(String::from("Unexpected exit_code")),
+        },
+    }
+
     // First authorization and checks if everything works
     let client = match auth_client().await {
         Ok(client) => client,
@@ -173,14 +183,14 @@ async fn real_main() -> Result<String, String> {
     // Getting data of current user
     let mut user_country = Country::Netherlands;
     #[allow(unused_assignments)]
-    let mut user_market = Market::Country(user_country.clone());
-    let content_types = [AdditionalType::Track, AdditionalType::Episode];
+    let mut _user_market = Market::Country(user_country.clone());
+    let _content_types = [AdditionalType::Track, AdditionalType::Episode];
     match online() {
         true => {
             match client.me().await {
                 Ok(me) => {
                     user_country = me.country.unwrap();
-                    user_market = Market::Country(user_country.clone());
+                    _user_market = Market::Country(user_country.clone());
                 }
                 // Check client prefix is correct in .env
                 Err(_) => return Err(String::from("Failed parsing spotify client")),
@@ -190,7 +200,7 @@ async fn real_main() -> Result<String, String> {
     }
 
     // Get playlist to play
-    let playlist = match get_playlist(&client).await {
+    let _playlist = match get_playlist(&client).await {
         Ok(playlist) => playlist,
         Err(e) => match e.as_str() {
             "Failed parsing playing settings" => {
@@ -210,9 +220,6 @@ async fn real_main() -> Result<String, String> {
 // Entry point
 #[tokio::main]
 async fn main() {
-    init_spotifyd();
-    return 0; // TODO currently working on spotifyd
-
     // Run application and match on exit codes
     exit(match real_main().await.unwrap().as_str() {
         "Program finished successfully" => {
