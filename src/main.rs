@@ -18,20 +18,14 @@ use std::{env, process::exit};
 // Self made files
 mod auth;
 mod spotifyd;
-use auth::auth_client;
-use spotifyd::init_spotifyd;
+use auth::*;
+use spotifyd::*;
 
 ///////////////
 // Functions //
 ///////////////
 
 // Useful functions
-
-// Get first variable of vector
-// https://stackoverflow.com/questions/36876570/return-first-item-of-vector#answer-36876741
-fn first<T>(v: &Vec<T>) -> Option<&T> {
-    v.first()
-}
 
 // Get if connected to internet
 fn online() -> bool {
@@ -97,7 +91,7 @@ async fn get_playlist(client: &rspotify::AuthCodeSpotify) -> Result<SimplifiedPl
                 Err(_) => return Err(String::from("Failed to connect to the internet")),
             };
             let mut playlist_found = false;
-            let mut afk_playlist = first(&playlists).unwrap();
+            let mut afk_playlist = playlists.first().unwrap();
             match env::var("PLAYLIST_NAME") {
                 Ok(_) => {
                     for playlist in &playlists {

@@ -69,9 +69,4 @@ pub fn start_spotifyd() {
     );
 }
 
-pub fn _stop_spotifyd() {
-    bash!(
-        "kill $(pgrep spotifyd --config-path {})",
-        env::var("SPOTIFYD_CONFIG_PATH").unwrap().as_str()
-    );
-}
+// TODO add function to stop spotifyd bij PID
