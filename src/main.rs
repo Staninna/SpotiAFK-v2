@@ -219,6 +219,10 @@ async fn real_main() -> Result<String, String> {
 // Entry point
 #[tokio::main]
 async fn main() {
+    dotenv::from_filename(".env").ok();
+    start_spotifyd();
+    stop_spotifyd();
+    return 0;
     // Run application and match on exit codes
     exit(match real_main().await.unwrap().as_str() {
         "Program finished successfully" => {
