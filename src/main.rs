@@ -155,11 +155,16 @@ async fn real_main() -> Result<String, String> {
     match init_spotifyd() {
         Ok(_) => (),
         Err(e) => match e.as_str() {
-            "Failed parsing spotifyd settings" => return Err(String::from("")),
-            "Failed to make spotifyd config file" => return Err(String::from("")),
+            "Failed parsing spotifyd settings" => {
+                return Err(String::from("Failed parsing spotifyd settings"))
+            }
+            "Failed to make spotifyd config file" => {
+                return Err(String::from("Failed to make spotifyd config file"))
+            }
+            "Failed to start spotifyd" => return Err(String::from("Failed to start spotifyd")),
             _ => return Err(String::from("Unexpected exit_code")),
         },
-    }
+    };
 
     // First authorization and checks if everything works
     let client = match auth_client().await {
@@ -242,6 +247,16 @@ async fn main() {
         }
         "Failed parsing spotifyd settings" => {
             println!("Failed parsing spotifyd settings, Please check your .env file");
+            1
+        }
+        "Failed to make spotifyd config file" => {
+            println!("Failed to make spotifyd config file, please try again");
+            1
+        }
+        "Failed to start spotifyd" => {
+            println!(
+                "Failed to start spotifyd, make sure spotifyd is installed and added to your PATH"
+            );
             1
         }
         _ => {

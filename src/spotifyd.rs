@@ -1,5 +1,4 @@
-use shells::bash;
-use std::{env, fs::File, io::prelude::*, path::Path};
+use std::{env, fs::File, io::prelude::*, path::Path, process::Command};
 
 // Check spotifyd settings
 pub fn init_spotifyd() -> Result<(), String> {
@@ -25,7 +24,13 @@ pub fn init_spotifyd() -> Result<(), String> {
         }
     }
 
-    start_spotifyd();
+    match start_spotifyd() {
+        Ok(_) => (),
+        Err(e) => match e.as_str() {
+            "Failed to start spotifyd" => return Err(String::from("Failed to start spotifyd")),
+            _ => return Err(String::from("Unexpected exit_code")),
+        },
+    };
 
     Ok(())
 }
@@ -62,11 +67,17 @@ fn make_config() -> std::io::Result<()> {
     Ok(())
 }
 
-pub fn start_spotifyd() {
-    bash!(
-        "spotifyd --config-path {}",
-        env::var("SPOTIFYD_CONFIG_PATH").unwrap().as_str()
-    );
+pub fn start_spotifyd() -> Result<(), String> {
+    match Command::new("spotifyd")
+        .args([
+            "--config-path",
+            env::var("SPOTIFYD_CONFIG_PATH").unwrap().as_str(),
+        ])
+        .spawn()
+    {
+        Ok(_) => Ok(()),
+        Err(_) => Err(String::from("Failed to start spotifyd")),
+    }
 }
 
-// TODO add function to stop spotifyd bij PID
+// TODO add function to kill spotifyd
