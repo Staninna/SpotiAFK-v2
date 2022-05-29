@@ -86,7 +86,7 @@ use std::{thread, time}; // Debugging
 pub fn stop_spotifyd() -> Result<(), String> {
     let wait_time = time::Duration::from_millis(10000);
     thread::sleep(wait_time);
-    let pid = match Command::new("pgrep")
+    let pids = match Command::new("pgrep")
         .args([
             "-f",
             format!(
@@ -100,8 +100,12 @@ pub fn stop_spotifyd() -> Result<(), String> {
         Ok(output) => String::from_utf8(output.stdout).unwrap(),
         Err(_) => return Err(String::from("Failed getting pid of spotifyd")),
     };
-
-    // TODO kill gotten PID's
-    println!("pid: {:?}", pid);
+    for pid in pids.lines() {
+        let kill = Command::new("kill").arg(pid).spawn();
+        match kill {
+            Ok(_) => (),
+            Err(_) => return Err(String::from("Failed stopping spotifyd")),
+        }
+    }
     Ok(())
 }

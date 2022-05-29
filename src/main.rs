@@ -213,6 +213,16 @@ async fn real_main() -> Result<String, String> {
     };
 
     // End of program
+    match stop_spotifyd() {
+        Ok(_) => (),
+        Err(e) => match e.as_str() {
+            "Failed getting pid of spotifyd" => {
+                return Err(String::from("Failed getting pid of spotifyd"))
+            }
+            "Failed stopping spotifyd" => return Err(String::from("Failed stopping spotifyd")),
+            _ => return Err(String::from("Unexpected exit_code")),
+        },
+    }
     Ok(String::from("Program finished successfully"))
 }
 
@@ -220,9 +230,6 @@ async fn real_main() -> Result<String, String> {
 #[tokio::main]
 async fn main() {
     dotenv::from_filename(".env").ok();
-    start_spotifyd();
-    stop_spotifyd();
-    return 0;
     // Run application and match on exit codes
     exit(match real_main().await.unwrap().as_str() {
         "Program finished successfully" => {
@@ -261,6 +268,14 @@ async fn main() {
             println!(
                 "Failed to start spotifyd, make sure spotifyd is installed and added to your PATH"
             );
+            1
+        }
+        "Failed getting pid of spotifyd" => {
+            println!("Failed getting pid of spotifyd, make sure pgrep is installed");
+            1
+        }
+        "Failed stopping spotifyd" => {
+            println!("Failed stopping spotifyd, make sure kill is installed");
             1
         }
         _ => {
