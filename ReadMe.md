@@ -1,4 +1,6 @@
-# Configuration
+# SpotiAFK-v2
+
+## Configuration
 
 Rules
 
@@ -47,3 +49,7 @@ Bitly API
 | BITLY_API_TOKEN | XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX | Get your API key on <https://dev.bitly.com/> |
 
 Rename this example.env to .env
+
+## Dependencies
+
+kill, spotifyd, pgrep
