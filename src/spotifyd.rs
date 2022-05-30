@@ -65,6 +65,10 @@ fn make_config() -> std::io::Result<()> {
         .concat(),
     )?;
 
+    // TODO add to .env because they are needed otherwise spotifyd crashes
+    config_file.write_all(b"backend = \"pulseaudio\"\n")?;
+    config_file.write_all(b"volume_controller = \"alsa\"\n")?;
+
     Ok(())
 }
 
