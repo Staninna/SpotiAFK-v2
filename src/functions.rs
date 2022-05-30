@@ -4,7 +4,11 @@
 
 // Extern imports
 use online::sync::check;
-use rspotify::{model::SimplifiedPlaylist, prelude::*};
+use rspotify::{
+    model::{Market, PlaylistId, PlaylistItem, SimplifiedPlaylist},
+    prelude::*,
+    AuthCodeSpotify,
+};
 use std::env;
 
 // Get if connected to internet
@@ -51,20 +55,18 @@ pub async fn get_playlist(
 }
 
 // Get playlists
-async fn get_playlists(
-    client: &rspotify::AuthCodeSpotify,
-) -> Result<Vec<SimplifiedPlaylist>, String> {
+async fn get_playlists(client: &AuthCodeSpotify) -> Result<Vec<SimplifiedPlaylist>, String> {
     // Make buffer variables
-    let offset = client.config.pagination_chunks;
     let mut playlists = Vec::new();
 
     // Get all playlists in a vector
-    let mut index = 0;
+    let limit = client.config.pagination_chunks;
+    let mut offset = 0;
     loop {
         // Request next playlists
         let response = match online() {
             true => client
-                .current_user_playlists_manual(Some(offset), Some(offset * index))
+                .current_user_playlists_manual(Some(limit), Some(offset))
                 .await
                 .unwrap(),
             false => return Err(String::from("Failed to connect to the internet")),
@@ -76,17 +78,17 @@ async fn get_playlists(
         }
 
         // If none playlist are left break
-        if response.next == None {
+        if response.next.is_none() {
             break;
         }
 
-        index += 1;
+        offset += limit;
     }
     Ok(playlists)
 }
 
 // Can i play?
-pub async fn is_playing(client: &rspotify::AuthCodeSpotify) -> Result<bool, String> {
+pub async fn is_playing(client: &AuthCodeSpotify) -> Result<bool, String> {
     match online() {
         true => {
             let is_playing = match client.current_user_playing_item().await.unwrap() {
@@ -121,4 +123,42 @@ pub async fn is_playing(client: &rspotify::AuthCodeSpotify) -> Result<bool, Stri
         }
         false => Err(String::from("Failed to connect to the internet")),
     }
+}
+
+// Get tracks from playlist
+pub async fn get_tracks(
+    client: &AuthCodeSpotify,
+    playlist: &PlaylistId,
+    market: &Market,
+) -> Result<Vec<PlaylistItem>, String> {
+    // Make buffer variables
+    let mut tracks = Vec::new();
+
+    // Get all tracks in a vector
+    let limit = client.config.pagination_chunks;
+    let mut offset = 0;
+    loop {
+        // Request next tracks
+        let response = match online() {
+            true => client
+                .playlist_items_manual(&playlist, None, Some(market), Some(limit), Some(offset))
+                .await
+                .unwrap(),
+            false => return Err(String::from("Failed to connect to the internet")),
+        };
+
+        // Put received tracks in vector
+        for track in response.items {
+            tracks.push(track);
+        }
+
+        // If none tracks are left break
+        if response.next.is_none() {
+            break;
+        }
+
+        offset += limit;
+    }
+
+    Ok(tracks)
 }
