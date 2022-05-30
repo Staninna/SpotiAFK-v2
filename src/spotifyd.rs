@@ -35,6 +35,7 @@ pub fn init_spotifyd() -> Result<(), String> {
     Ok(())
 }
 
+// TODO maybe make more settings by matching on SPOTIFYD_{SETTING_NAME} from .env file
 fn make_config() -> std::io::Result<()> {
     let mut config_file = File::create(env::var("SPOTIFYD_CONFIG_PATH").unwrap().as_str())?;
 
@@ -80,12 +81,7 @@ pub fn start_spotifyd() -> Result<(), String> {
     }
 }
 
-// TODO add function to kill spotifyd
-use std::{thread, time}; // Debugging
-
 pub fn stop_spotifyd() -> Result<(), String> {
-    let wait_time = time::Duration::from_millis(10000);
-    thread::sleep(wait_time);
     let pids = match Command::new("pgrep")
         .args([
             "-f",
