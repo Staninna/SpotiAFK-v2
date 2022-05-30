@@ -11,6 +11,10 @@ use rspotify::{
 };
 use std::env;
 
+///////////////
+// Functions //
+///////////////
+
 // Get if connected to internet
 pub fn online() -> bool {
     match check(None) {

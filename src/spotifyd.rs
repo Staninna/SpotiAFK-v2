@@ -1,4 +1,12 @@
+/////////////
+// Imports //
+/////////////
+
 use std::{env, fs::File, io::prelude::*, path::Path, process::Command};
+
+///////////////
+// Functions //
+///////////////
 
 // Check spotifyd settings
 pub fn init_spotifyd() -> Result<(), String> {

@@ -1,4 +1,7 @@
-// Imports
+/////////////
+// Imports //
+/////////////
+
 use rspotify::{
     prelude::*, scopes, AuthCodeSpotify, Config, Credentials, OAuth, DEFAULT_API_PREFIX,
     DEFAULT_CACHE_PATH, DEFAULT_PAGINATION_CHUNKS,
@@ -6,7 +9,9 @@ use rspotify::{
 use std::{env, path};
 use urlshortener::{client::UrlShortener, providers::Provider};
 
-// Functions
+///////////////
+// Functions //
+///////////////
 
 // Auth to spotify API
 pub async fn auth_client() -> Result<rspotify::AuthCodeSpotify, String> {
