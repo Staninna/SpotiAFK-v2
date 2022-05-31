@@ -166,3 +166,26 @@ pub async fn get_tracks(
 
     Ok(tracks)
 }
+
+// Parse playing settings
+pub fn parse_playing_settings() -> Result<(), String> {
+    // Make buffer variables
+    let mut found_settings = 0;
+
+    // Loop over all environment variables
+    for (key, _) in env::vars() {
+        match key.as_str() {
+            // Set client prefix from .env
+            "CHECKS_BEFORE_PLAYING"
+            | "PLAYLIST_NAME"
+            | "SKIP_TRACKS"
+            | "WAIT_TILL_SKIP"
+            | "TIME_BETWEEN_CHECKS" => found_settings += 1,
+            _ => (),
+        }
+    }
+    match found_settings {
+        4 => Ok(()),
+        _ => Err(String::from("Failed parsing playing settings")),
+    }
+}

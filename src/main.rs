@@ -12,7 +12,7 @@ use rspotify::{
     model::{AdditionalType, Country, Market},
     prelude::*,
 };
-use std::process::exit;
+use std::{env, process::exit, thread, time::Duration};
 
 // Self made files
 mod auth;
@@ -96,6 +96,48 @@ async fn real_main() -> Result<String, String> {
             _ => return Err(String::from("Unexpected exit_code")),
         },
     };
+
+    // Check playing settings
+    match parse_playing_settings() {
+        Ok(_) => (),
+        Err(_) => return Err(String::from("Failed parsing playing settings")),
+    }
+
+    let mut tracks = get_tracks(&client, &playlist.id, &user_market)
+        .await
+        .unwrap();
+    let mut can_i_play_counter = 0;
+    let skip_wait_time = env::var("WAIT_TILL_SKIP").unwrap().parse::<u64>().unwrap();
+    let check_wait_time = env::var("TIME_BETWEEN_CHECKS")
+        .unwrap()
+        .parse::<u64>()
+        .unwrap();
+
+    loop {
+        match is_playing(&client).await {
+            Ok(bool) => match bool {
+                true => can_i_play_counter += 1,
+                false => can_i_play_counter = 0,
+            },
+            Err(_) => (),
+        }
+        thread::sleep(Duration::from_secs(check_wait_time));
+        while can_i_play_counter
+            >= env::var("CHECKS_BEFORE_PLAYING")
+                .unwrap()
+                .parse::<i32>()
+                .unwrap()
+        {
+            if tracks.len() == 0 {
+                tracks = get_tracks(&client, &playlist.id, &user_market)
+                    .await
+                    .unwrap();
+            }
+            let current_track = tracks.pop();
+            // TODO play track somehow in spotifyd by putting it in the queue before any api interaction check is_playing()
+        }
+        break;
+    }
 
     // End of program
     match stop_spotifyd() {

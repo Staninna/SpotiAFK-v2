@@ -27,9 +27,13 @@ Spotify client config recommended to keep as defaults not tested changed
 
 Required
 Playing settings
-| Options       | Default      | Info                     |
-|---------------|--------------|--------------------------|
-| PLAYLIST_NAME | AFK_PLAYLIST | Name of playlist to paly |
+| Options               | Default      | Info                                        |
+|-----------------------|--------------|---------------------------------------------|
+| PLAYLIST_NAME         | AFK_PLAYLIST | Name of playlist to play                    |
+| CHECKS_BEFORE_PLAYING | 5            | Times to check if i can play before playing |
+| TIME_BETWEEN_CHECKS   | 30           | Time between checks if i can play           |
+| SKIP_TRACKS           | true         | If the program should skip tracks           |
+| WAIT_TILL_SKIP        | 35           | Wait time before skipping a track           |
 
 Required
 Documentation <https://github.com/Spotifyd/spotifyd>
