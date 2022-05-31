@@ -185,7 +185,7 @@ pub fn parse_playing_settings() -> Result<(), String> {
         }
     }
     match found_settings {
-        4 => Ok(()),
+        5 => Ok(()),
         _ => Err(String::from("Failed parsing playing settings")),
     }
 }
