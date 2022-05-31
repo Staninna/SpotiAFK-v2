@@ -103,21 +103,33 @@ async fn real_main() -> Result<String, String> {
         Err(_) => return Err(String::from("Failed parsing playing settings")),
     }
 
-    let mut tracks = get_tracks(&client, &playlist.id, &user_market)
-        .await
-        .unwrap();
+    let mut device_id = None;
+    for device in client.device().await.unwrap() {
+        if device.name == env::var("SPOTIFYD_DEVICE_NAME").unwrap() {
+            device_id = device.id;
+            break;
+        }
+    }
+
+    let mut played = false;
     let mut can_i_play_counter = 0;
     let skip_wait_time = env::var("WAIT_TILL_SKIP").unwrap().parse::<u64>().unwrap();
     let check_wait_time = env::var("TIME_BETWEEN_CHECKS")
         .unwrap()
         .parse::<u64>()
         .unwrap();
-
+    let mut tracks = get_tracks(&client, &playlist.id, &user_market)
+        .await
+        .unwrap();
     loop {
+        played = false;
         match is_playing(&client).await {
             Ok(bool) => match bool {
                 true => can_i_play_counter += 1,
-                false => can_i_play_counter = 0,
+                false => {
+                    can_i_play_counter = 0;
+                    break; // DEBUG
+                }
             },
             Err(_) => (),
         }
@@ -128,6 +140,15 @@ async fn real_main() -> Result<String, String> {
                 .parse::<i32>()
                 .unwrap()
         {
+            if !played {
+                match client
+                    .transfer_playback(&device_id.as_ref().unwrap(), Some(false))
+                    .await
+                {
+                    Ok(_) => played = true,
+                    Err(_) => continue,
+                }
+            }
             if tracks.len() == 0 {
                 tracks = get_tracks(&client, &playlist.id, &user_market)
                     .await
@@ -136,7 +157,6 @@ async fn real_main() -> Result<String, String> {
             let current_track = tracks.pop();
             // TODO play track somehow in spotifyd by putting it in the queue before any api interaction check is_playing()
         }
-        break;
     }
 
     // End of program
