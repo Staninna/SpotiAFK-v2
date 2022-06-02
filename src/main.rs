@@ -159,16 +159,9 @@ async fn real_main() -> Result<String, String> {
                     .unwrap();
             }
             let current_track = tracks.pop();
-            let track_id = current_track.as_ref().unwrap().track.as_ref().unwrap().id();
+            let track_id = current_track.unwrap().track.unwrap().id();
 
-            print_type_of(&current_track);
-            // Output: core::option::Option<rspotify_model::playlist::PlaylistItem>
-            print_type_of(&track_id);
-            // Output: &core::option::Option<&dyn rspotify_model::idtypes::PlayableId>
-            print_type_of(&client);
-            // Output: rspotify::auth_code::AuthCodeSpotify
-
-            &client.add_item_to_queue(track_id.unwrap(), Some(device_id.unwrap().as_str()));
+            client.add_item_to_queue(&track_id.unwrap(), Some(device_id.unwrap().as_str()));
             // TODO play track somehow in spotifyd by putting it in the queue before any api interaction check is_playing()
         }
     }
